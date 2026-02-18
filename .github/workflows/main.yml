@@ -1,69 +1,55 @@
-name: CI/CD - Docker Build & Push (Ubuntu)
+name: CI/CD to Kubernetes
 
 on:
   push:
     branches:
       - main
 
-env:
-  FRONTEND_IMAGE: abivarmang/frontend
-  BACKEND_IMAGE: abivarmang/backend
-
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      FRONTEND_IMAGE: yourdockerhubusername/frontend
+      BACKEND_IMAGE: yourdockerhubusername/backend
+      FRONTEND_IMAGE_TAG: latest
+      BACKEND_IMAGE_TAG: latest
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     steps:
-      # -------------------------------
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      # 1️⃣ Checkout repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      # -------------------------------
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      # 2️⃣ Log in to Docker Hub
+      - name: Docker Login
+        uses: docker/login-action@v2
         with:
-          node-version: 18
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # -------------------------------
-      - name: Install Backend Dependencies
+      # 3️⃣ Build & Push Backend image
+      - name: Build & Push Backend
         run: |
-          cd backend
-          npm ci
+          docker build -t $BACKEND_IMAGE:$BACKEND_IMAGE_TAG ./backend
+          docker push $BACKEND_IMAGE:$BACKEND_IMAGE_TAG
 
-      - name: Install Frontend Dependencies & Build
+      # 4️⃣ Build & Push Frontend image
+      - name: Build & Push Frontend
         run: |
-          cd frontend
-          npm ci
-          npm run build
+          docker build -t $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG ./frontend
+          docker push $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG
 
-      # -------------------------------
-      - name: Log in to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      # -------------------------------
-      - name: Build and Push Backend Docker Image
+      # 5️⃣ Decode Kubeconfig and set environment
+      - name: Setup Kubeconfig
         run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          docker build -t $BACKEND_IMAGE:$TIMESTAMP backend
-          docker push $BACKEND_IMAGE:$TIMESTAMP
-          echo "BACKEND_IMAGE_TAG=$TIMESTAMP" >> $GITHUB_ENV
+          echo "$KUBECONFIG_DATA" | base64 --decode > $HOME/kubeconfig
+          export KUBECONFIG=$HOME/kubeconfig
+          chmod 600 $HOME/kubeconfig
 
-      - name: Build and Push Frontend Docker Image
-        run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          docker build -t $FRONTEND_IMAGE:$TIMESTAMP frontend
-          docker push $FRONTEND_IMAGE:$TIMESTAMP
-          echo "FRONTEND_IMAGE_TAG=$TIMESTAMP" >> $GITHUB_ENV
-
-      # -------------------------------
-      # Optional: Deploy to Kubernetes (remote cluster)
+      # 6️⃣ Deploy to Kubernetes
       - name: Deploy to Kubernetes
-        if: env.KUBECONFIG
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG_DATA }}
         run: |
           kubectl apply -f k8s/
           kubectl rollout status deployment/backend
