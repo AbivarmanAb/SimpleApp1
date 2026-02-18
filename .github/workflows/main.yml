@@ -9,8 +9,8 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      FRONTEND_IMAGE: yourdockerhubusername/frontend
-      BACKEND_IMAGE: yourdockerhubusername/backend
+      FRONTEND_IMAGE: abivarmang/frontend
+      BACKEND_IMAGE: abivarmang/backend
       FRONTEND_IMAGE_TAG: latest
       BACKEND_IMAGE_TAG: latest
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
