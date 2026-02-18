@@ -1,4 +1,4 @@
-name: CI/CD - Docker Build, Push & Minikube Deploy
+name: CI/CD - Docker Build & Push (Ubuntu)
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   BACKEND_IMAGE: abivarmang/backend
 
 jobs:
-  build-push-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,38 +46,26 @@ jobs:
       # -------------------------------
       - name: Build and Push Backend Docker Image
         run: |
-          VERSION=$(date +%Y%m%d%H%M%S)
-          echo "Building backend image: $BACKEND_IMAGE:$VERSION"
-          docker build -t $BACKEND_IMAGE:$VERSION backend
-          docker push $BACKEND_IMAGE:$VERSION
-          echo "BACKEND_IMAGE_TAG=$VERSION" >> $GITHUB_ENV
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          docker build -t $BACKEND_IMAGE:$TIMESTAMP backend
+          docker push $BACKEND_IMAGE:$TIMESTAMP
+          echo "BACKEND_IMAGE_TAG=$TIMESTAMP" >> $GITHUB_ENV
 
       - name: Build and Push Frontend Docker Image
         run: |
-          VERSION=$(date +%Y%m%d%H%M%S)
-          echo "Building frontend image: $FRONTEND_IMAGE:$VERSION"
-          docker build -t $FRONTEND_IMAGE:$VERSION frontend
-          docker push $FRONTEND_IMAGE:$VERSION
-          echo "FRONTEND_IMAGE_TAG=$VERSION" >> $GITHUB_ENV
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          docker build -t $FRONTEND_IMAGE:$TIMESTAMP frontend
+          docker push $FRONTEND_IMAGE:$TIMESTAMP
+          echo "FRONTEND_IMAGE_TAG=$TIMESTAMP" >> $GITHUB_ENV
 
       # -------------------------------
-      - name: Configure Minikube Docker
+      # Optional: Deploy to Kubernetes (remote cluster)
+      - name: Deploy to Kubernetes
+        if: env.KUBECONFIG
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_DATA }}
         run: |
-          minikube -p minikube docker-env --shell powershell | Invoke-Expression
-
-      # -------------------------------
-      - name: Update Kubernetes Manifests with Versioned Images
-        run: |
-          sed -i "s|image: abivarmang/backend:.*|image: abivarmang/backend:${BACKEND_IMAGE_TAG}|" k8s/backend-deployment.yaml
-          sed -i "s|image: abivarmang/frontend:.*|image: abivarmang/frontend:${FRONTEND_IMAGE_TAG}|" k8s/frontend-deployment.yaml
-
-      # -------------------------------
-      - name: Deploy to Minikube
-        run: |
-          minikube kubectl -- apply -f k8s/
-          minikube kubectl -- rollout status deployment/backend
-          minikube kubectl -- rollout status deployment/frontend
-
-      # -------------------------------
-      - name: Verify Pods
-        run: minikube kubectl -- get pods
+          kubectl apply -f k8s/
+          kubectl rollout status deployment/backend
+          kubectl rollout status deployment/frontend
+          kubectl get pods
