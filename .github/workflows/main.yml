@@ -13,6 +13,7 @@ jobs:
       BACKEND_IMAGE: abivarmang/backend
       FRONTEND_IMAGE_TAG: latest
       BACKEND_IMAGE_TAG: latest
+      KUBECONFIG: $HOME/.kube/config
 
     steps:
       # 1️⃣ Checkout repository
@@ -38,19 +39,16 @@ jobs:
           docker build -t $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG ./frontend
           docker push $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG
 
-      # 5️⃣ Setup Kubeconfig for all subsequent steps
+      # 5️⃣ Setup Kubeconfig
       - name: Setup Kubeconfig
         run: |
+          mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
-        # Persist KUBECONFIG for all steps
-        shell: bash
-        env:
-          KUBECONFIG: $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
 
       # 6️⃣ Deploy to Kubernetes
       - name: Deploy to Kubernetes
-        env:
-          KUBECONFIG: $HOME/.kube/config
         run: |
           kubectl apply -f k8s/
           kubectl rollout status deployment/backend
