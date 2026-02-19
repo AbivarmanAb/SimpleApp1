@@ -37,10 +37,10 @@ jobs:
       - name: Deploy Frontend
         run: kubectl apply -f k8s/frontend.yaml
 
-      - name: Restart Deployments (Pull Latest Image)
-        run: |
-          kubectl rollout restart deployment/backend -n app-namespace
-          kubectl rollout restart deployment/frontend -n app-namespace
+      # - name: Restart Deployments (Pull Latest Image)
+      #   run: |
+      #     kubectl rollout restart deployment/backend -n app-namespace
+      #     kubectl rollout restart deployment/frontend -n app-namespace
 
       - name: Verify Rollout
         run: |
