@@ -1,4 +1,4 @@
-name: CI/CD to Kubernetes
+name: Local Deploy
 
 on:
   push:
@@ -6,53 +6,27 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    env:
-      FRONTEND_IMAGE: abivarmang/frontend
-      BACKEND_IMAGE: abivarmang/backend
-      FRONTEND_IMAGE_TAG: latest
-      BACKEND_IMAGE_TAG: latest
-      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+  deploy:
+    runs-on: self-hosted
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      # 2️⃣ Docker login
-      - name: Docker Login
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Login to DockerHub
+      run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # 3️⃣ Build & Push Backend Docker image
-      - name: Build & Push Backend
-        run: |
-          docker build -t $BACKEND_IMAGE:$BACKEND_IMAGE_TAG ./backend
-          docker push $BACKEND_IMAGE:$BACKEND_IMAGE_TAG
+    - name: Build Backend Image
+      run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./backend
 
-      # 4️⃣ Build & Push Frontend Docker image
-      - name: Build & Push Frontend
-        run: |
-          docker build -t $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG ./frontend
-          docker push $FRONTEND_IMAGE:$FRONTEND_IMAGE_TAG
+    - name: Build Frontend Image
+      run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./frontend
 
-      # 5️⃣ Setup Kubeconfig
-      - name: Setup Kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "$KUBECONFIG_DATA" | base64 --decode > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-          export KUBECONFIG=$HOME/.kube/config
+    - name: Push Backend Image
+      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
 
-      # 6️⃣ Deploy to Kubernetes
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f k8s/
-          kubectl rollout status deployment/backend
-          kubectl rollout status deployment/frontend
-          kubectl get pods
+    - name: Push Frontend Image
+      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+
+    - name: Deploy to Kubernetes
+      run: kubectl apply -f k8s/
