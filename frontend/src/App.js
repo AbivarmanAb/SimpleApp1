@@ -12,7 +12,7 @@ function App() {
 
   const fetchMessages = async () => {
     try {
-      const res = await axios.get("https://orange-space-goggles-5000.app.github.dev/messages");
+      const res = await axios.get("https://orange-space-goggles-5000.app.github.dev/api/messages");
       setMessages(res.data);
     } catch (err) {
       console.error(err);
