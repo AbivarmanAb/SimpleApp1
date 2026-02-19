@@ -1,4 +1,4 @@
-name: Local Deploy
+name: CI-CD Local Deploy
 
 on:
   push:
@@ -13,20 +13,61 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
+    # -------------------------------
+    # Login to DockerHub
+    # -------------------------------
     - name: Login to DockerHub
-      run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      run: |
+        echo "${{ secrets.DOCKERHUB_PASSWORD }}" | \
+        docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+    # -------------------------------
+    # Build Images
+    # -------------------------------
     - name: Build Backend Image
       run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./backend
 
     - name: Build Frontend Image
       run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./frontend
 
+    # -------------------------------
+    # Push Images
+    # -------------------------------
     - name: Push Backend Image
       run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
 
     - name: Push Frontend Image
       run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
-    - name: Deploy to Kubernetes
-      run: kubectl apply -f k8s/
+    # -------------------------------
+    # Create Namespace First
+    # -------------------------------
+    - name: Create Namespace
+      run: kubectl apply -f k8s/namespace.yaml
+
+    # -------------------------------
+    # Deploy MongoDB
+    # -------------------------------
+    - name: Deploy MongoDB
+      run: kubectl apply -f k8s/mongodb.yaml
+
+    # -------------------------------
+    # Deploy Backend
+    # -------------------------------
+    - name: Deploy Backend
+      run: kubectl apply -f k8s/backend.yaml
+
+    # -------------------------------
+    # Deploy Frontend
+    # -------------------------------
+    - name: Deploy Frontend
+      run: kubectl apply -f k8s/frontend.yaml
+
+    # -------------------------------
+    # Wait for Rollout
+    # -------------------------------
+    - name: Verify Deployment
+      run: |
+        kubectl rollout status deployment/mongodb -n app-namespace
+        kubectl rollout status deployment/backend -n app-namespace
+        kubectl rollout status deployment/frontend -n app-namespace
